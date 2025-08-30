@@ -21,7 +21,7 @@
 <body>
   <div id="app">
     <header>
-      <h1>Iterative Cube Truncation Simulator</h1>
+      <h1>The Compounding Effect of Incremental Changes</h1>
       <div class="sub">Cut corners toward the center, repeatedly — watch the shape round towards a sphere.</div>
     </header>
     <div id="viewport" style="position:relative;">
@@ -54,7 +54,7 @@
       const M = [
         [A[0].x, A[0].y, A[0].z, b[0]],
         [A[1].x, A[1].y, A[1].z, b[1]],
-        [A[2].x, A[2].y, A[2].z, b[2]],
+        [A[2].x, A[2].y, A[2].z, b[2]]
       ];
       // Pivoted Gaussian elimination
       for (let col=0; col<3; col++){
@@ -360,14 +360,110 @@
       controls.update();
     }
 
-    function startAnimatedCuts() {
-      if (animationState.isAnimating) return;
+    function toggleAutoTransition() {
+      params.autoTransitionEnabled = !params.autoTransitionEnabled;
+      updateAutoTransitionButton();
+      
+      if (params.autoTransitionEnabled) {
+        startAutoTransition();
+      } else {
+        // Stop auto transition and any current animation
+        animationState.isAutoTransitioning = false;
+        animationState.isAnimating = false;
+        animationState.isGlowing = false;
+        animationState.onAnimationComplete = null;
+      }
+    }
+    
+    function startAutoTransition() {
+      if (!params.autoTransitionEnabled) return;
+      
+      // Auto transition from current state through iterations 2, 3, 4
+      animationState.isAutoTransitioning = true;
+      animationState.transitionIterations = [2, 3, 4];
+      animationState.currentTransitionIndex = 0;
+      
+      // Set initial cut speeds for each iteration
+      animationState.cutSpeeds = {
+        1: 5000,
+        2: 100,
+        3: 50,
+        4: 10
+      };
+      
+      // Start with iteration 1 if not already there
+      params.iterations = 1;
+      rebuild();
+      
+      // Wait a moment then start transitioning
+      setTimeout(() => {
+        if (params.autoTransitionEnabled) {
+          transitionToNextIteration();
+        }
+      }, 10000);
+    }
+    
+    function transitionToNextIteration() {
+      if (!animationState.isAutoTransitioning || !params.autoTransitionEnabled ||
+          animationState.currentTransitionIndex >= animationState.transitionIterations.length) {
+        // Finished all transitions or auto-transition disabled
+        animationState.isAutoTransitioning = false;
+        // If we finished all transitions, restart from beginning
+        if (params.autoTransitionEnabled && animationState.currentTransitionIndex >= animationState.transitionIterations.length) {
+          setTimeout(() => {
+            if (params.autoTransitionEnabled) {
+              startAutoTransition();
+            }
+          }, 2000); // Wait 2 seconds before restarting
+        }
+        return;
+      }
+      
+      const targetIteration = animationState.transitionIterations[animationState.currentTransitionIndex];
+      animationState.currentTransitionIndex++;
+      
+      
+      // Update params and cut speed for this iteration
+      params.iterations = targetIteration;
+      params.cutSpeed = animationState.cutSpeeds[targetIteration];
+      params.animateCuts = true; // Ensure animation is enabled
+      
+      // Update GUI to reflect new values
+      if (window.iterController) {
+        window.iterController.updateDisplay();
+      }
+      if (window.speedController) {
+        window.speedController.updateDisplay();
+      }
+      
+      // Stop any current animation before starting new one
+      animationState.isAnimating = false;
+      
+      // Start animated cuts for this iteration
+      startAnimatedCuts(() => {
+        // After this iteration completes, wait then transition to next
+        if (animationState.currentTransitionIndex < animationState.transitionIterations.length) {
+          setTimeout(() => {
+            transitionToNextIteration();
+          }, 500); // Brief pause between iterations
+        } else {
+          animationState.isAutoTransitioning = false;
+        }
+      });
+    }
+    
+    function startAnimatedCuts(onComplete) {
+      if (animationState.isAnimating) {
+        if (onComplete) onComplete(); // Call callback immediately if skipping
+        return;
+      }
       
       animationState.isAnimating = true;
       animationState.currentIteration = params.iterations; // Start from the target iteration
       animationState.currentCut = 0;
       animationState.targetIterations = params.iterations;
       animationState.isGlowing = false;
+      animationState.onAnimationComplete = onComplete; // Store callback
       
       if (params.iterations === 0) {
         // Show cube and finish
@@ -375,6 +471,7 @@
         const geom = buildGeometryFromPlanes(planes, []);
         updateMesh(geom);
         animationState.isAnimating = false;
+        if (onComplete) onComplete();
         return;
       }
       
@@ -466,10 +563,18 @@
       const iterPlanes = buildPlanesForIterativeTruncation(depth, animationState.currentIteration - 1);
       const vertices = computePolyhedronVertices(iterPlanes);
       
+      
       // Check if we've finished all cuts for this iteration
       if (animationState.currentCut >= vertices.length) {
         // We've finished the current iteration, stop animating
         animationState.isAnimating = false;
+        
+        // Only call the callback once and then clear it
+        if (animationState.onAnimationComplete) {
+          const callback = animationState.onAnimationComplete;
+          animationState.onAnimationComplete = null; // Clear it before calling to prevent double execution
+          callback();
+        }
         return;
       }
       
@@ -574,7 +679,7 @@
       animationState.isAnimating = false;
       
       if (params.animateCuts && params.iterations > 0) {
-        startAnimatedCuts();
+        startAnimatedCuts(null); // No callback for regular rebuilds
         return;
       }
       
@@ -627,13 +732,15 @@
     }
 
     const params = {
-      depthPct: 10,          // percentage of distance from vertex to center removed each round
+      depthPct: 5,          // percentage of distance from vertex to center removed each round
       iterations: 1,
       autoRotate: true,
       animateCuts: true,
       cutSpeed: 500,         // milliseconds between cuts
       startingShape: 'cube', // 'cube' or 'pyramid'
       resetView: () => { camera.position.set(4.2,3.2,4.6); controls.target.set(0,0,0); controls.update(); },
+      autoTransitionEnabled: true,
+      toggleAutoTransition: () => { toggleAutoTransition(); }
     };
     
     let animationState = {
@@ -645,20 +752,46 @@
       newPlaneIndices: new Set(), // Track which planes are newly added
       baseIteration: 0, // Base iteration to start from for current animation
       isGlowing: false,
-      targetScaling: false // Flag to use target iteration scaling
+      targetScaling: false, // Flag to use target iteration scaling
+      isAutoTransitioning: false,
+      transitionIterations: [],
+      currentTransitionIndex: 0,
+      cutSpeeds: {},
+      onAnimationComplete: null
     };
 
     const gui = new lil.GUI({ title: 'Controls' });
     gui.add(params, 'startingShape', ['cube', 'pyramid']).name('Starting shape').onChange(rebuild);
     gui.add(params, 'depthPct', 0.1, 45, 0.1).name('Cut depth %').onChange(rebuild);
-    gui.add(params, 'iterations', 0, 8, 1).name('Iterations').onChange(rebuild);
+    window.iterController = gui.add(params, 'iterations', 0, 4, 1).name('Iterations').onChange(() => {
+      if (!animationState.isAutoTransitioning) rebuild();
+    });
     gui.add(params, 'animateCuts').name('Animate cuts');
-    gui.add(params, 'cutSpeed', 100, 2000, 50).name('Cut speed (ms)');
+    window.speedController = gui.add(params, 'cutSpeed', 50, 2000, 50).name('Cut speed (ms)');
     gui.add(params, 'autoRotate').name('Auto-rotate');
     gui.add(params, 'resetView').name('Reset View');
+    window.autoTransitionButton = gui.add(params, 'toggleAutoTransition').name('View Animation');
+    
+    // Update button color based on state
+    function updateAutoTransitionButton() {
+      const button = window.autoTransitionButton?.domElement?.querySelector('.name');
+      if (button) {
+        button.style.color = params.autoTransitionEnabled ? '#7dd3fc' : '#e6e9ef';
+        button.style.fontWeight = params.autoTransitionEnabled ? '600' : '400';
+      }
+    }
 
     // Build initial
     rebuild();
+    
+    // Update button color initially and start auto-transition
+    setTimeout(() => {
+      updateAutoTransitionButton();
+      // Start auto-transition on page load if enabled
+      if (params.autoTransitionEnabled) {
+        startAutoTransition();
+      }
+    }, 500);
 
     // Animate
     function animate(){
