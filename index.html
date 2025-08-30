@@ -496,7 +496,9 @@
       
       if (!animationState.isGlowing) {
         // Make the cut and start glowing
-        animationState.currentCut++;
+        // For iteration 4, cut 2 vertices at a time
+        const cutsPerStep = (animationState.currentIteration === 4) ? 2 : 1;
+        animationState.currentCut += cutsPerStep;
         
         // Get planes for current state with new plane tracking  
         const result = buildPlanesForIterativeTruncation(depth, animationState.currentIteration, animationState.currentCut, true);
