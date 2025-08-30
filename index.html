@@ -22,7 +22,7 @@
   <div id="app">
     <header>
       <h1>Iterative Cube Truncation Simulator</h1>
-      <div class="sub">Cut corners toward the center, repeatedly — watch the cube round toward a sphere.</div>
+      <div class="sub">Cut corners toward the center, repeatedly — watch the shape round towards a sphere.</div>
     </header>
     <div id="viewport" style="position:relative;">
       <canvas id="canvas"></canvas>
@@ -129,9 +129,12 @@
         planes.push(new Plane(new THREE.Vector3(0, norm,-norm), norm)); // Back face
       }
 
-      let vertices = computePolyhedronVertices(planes);
       for (let k=0; k<iterations; k++) {
         const currentDepth = depth * Math.pow(1.5, k); // 50% increase each iteration
+        
+        // Get current vertices for this iteration
+        const vertices = computePolyhedronVertices(planes);
+        if (vertices.length === 0) break; // fully clipped (depth too high)
         
         // Limit planes to prevent exponential growth
         if (planes.length > 100) {
@@ -141,9 +144,10 @@
         
         const newPlanes = [];
         for (const v of vertices) {
-          const n = v.clone().normalize(); // from center toward vertex
-          const len = v.length();
-          const c = (1 - currentDepth) * len;     // move plane toward center
+          // Create plane facing toward center from this vertex
+          const n = v.clone().normalize(); // direction from center toward vertex
+          const len = v.length(); // distance from center
+          const c = (1 - currentDepth) * len; // move plane toward center by currentDepth
           newPlanes.push(new Plane(n, c));
         }
         
@@ -173,8 +177,6 @@
             }
           }
         }
-        vertices = computePolyhedronVertices(planes);
-        if (vertices.length === 0) break; // fully clipped (depth too high)
       }
       return trackNewPlanes ? { planes, newPlaneIndices } : planes;
     }
@@ -465,7 +467,7 @@
       const vertices = computePolyhedronVertices(iterPlanes);
       
       // Check if we've finished all cuts for this iteration
-      if (animationState.currentCut >= vertices.length || animationState.currentCut >= 8) {
+      if (animationState.currentCut >= vertices.length) {
         // We've finished the current iteration, stop animating
         animationState.isAnimating = false;
         return;
@@ -603,9 +605,11 @@
       if (animationState.isAnimating) {
         // Show only progress bar during animation
         const depth = params.depthPct / 100;
-        const iterPlanes = buildPlanesForIterativeTruncation(depth, animationState.currentIteration - 1);
+        // Get vertices from the starting state of current iteration (previous iteration result)
+        const startingIteration = animationState.currentIteration - 1;
+        const iterPlanes = buildPlanesForIterativeTruncation(depth, startingIteration);
         const vertices = computePolyhedronVertices(iterPlanes);
-        const totalCuts = Math.min(vertices.length, 8);
+        const totalCuts = vertices.length; // Don't cap at 8 - use actual vertex count
         const remaining = totalCuts - animationState.currentCut;
         const progress = (animationState.currentCut / totalCuts) * 100;
         
