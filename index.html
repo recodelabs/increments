@@ -16,6 +16,95 @@
     .footer { position: absolute; left: 12px; bottom: 12px; opacity: .6; font-size: 12px; }
     a { color: #7dd3fc; text-decoration: none; }
     .err { position:absolute; left:12px; top:56px; background:#2b1111; color:#ffd4d4; padding:8px 10px; border:1px solid #512020; border-radius:8px; font-size:12px; max-width: 50ch; display:none; }
+    
+    /* Popup styles */
+    .popup-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+    }
+    .popup {
+      background: #1a1d21;
+      border: 1px solid #2a2f38;
+      border-radius: 12px;
+      padding: 24px;
+      min-width: 320px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+    .popup h2 {
+      margin: 0 0 20px 0;
+      font-size: 20px;
+      color: #e6e9ef;
+      font-weight: 600;
+    }
+    .popup-field {
+      margin-bottom: 16px;
+    }
+    .popup-field label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+    .popup-field select,
+    .popup-field input {
+      width: 100%;
+      background: #0f1216;
+      border: 1px solid #2a2f38;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #e6e9ef;
+      font-size: 14px;
+    }
+    .popup-field input[type="range"] {
+      padding: 4px 0;
+    }
+    .popup-field .range-value {
+      display: inline-block;
+      margin-left: 8px;
+      color: #7dd3fc;
+      font-weight: 600;
+      min-width: 40px;
+    }
+    .popup-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .popup-button {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+    }
+    .popup-button.primary {
+      background: #7dd3fc;
+      color: #0b0d10;
+    }
+    .popup-button.primary:hover {
+      background: #93dafe;
+    }
+    .popup-button.secondary {
+      background: #2a2f38;
+      color: #e6e9ef;
+    }
+    .popup-button.secondary:hover {
+      background: #3a3f48;
+    }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
@@ -29,6 +118,42 @@
       <div class="hud" id="hud"></div>
       <div class="err" id="err"></div>
       <div class="footer">Drag to orbit • Scroll to zoom • Shift+Drag to pan</div>
+    </div>
+  </div>
+  
+  <!-- Configuration Popup -->
+  <div id="configPopup" class="popup-overlay">
+    <div class="popup">
+      <h2>Incremental Changes</h2>
+      <div class="popup-field">
+        <label for="popupShape">Starting Shape</label>
+        <select id="popupShape">
+          <option value="cube">Cube</option>
+          <option value="pyramid">Pyramid</option>
+          <option value="diamond">Diamond (Octahedron)</option>
+          <option value="rectangle">Rectangle</option>
+          <option value="parallelogram">Parallelogram</option>
+          <option value="cylinder">Cylinder</option>
+          <option value="star">Star</option>
+          <option value="hexagon">Hexagonal Prism</option>
+        </select>
+      </div>
+      <div class="popup-field">
+        <label for="popupDepth">Cut Depth: <span id="depthValue" class="range-value">5%</span></label>
+        <input type="range" id="popupDepth" min="1" max="45" value="5" step="1">
+      </div>
+      <div class="popup-field">
+        <label for="popupOpacity">Fill Opacity: <span id="opacityValue" class="range-value">70%</span></label>
+        <input type="range" id="popupOpacity" min="0" max="100" value="70" step="1">
+      </div>
+      <div class="popup-field">
+        <label for="popupColor">Shape Color</label>
+        <input type="color" id="popupColor" value="#6ba6ff">
+      </div>
+      <div class="popup-buttons">
+        <button id="startAnimation" class="popup-button primary">Start Animation</button>
+        <button id="cancelPopup" class="popup-button secondary">Cancel</button>
+      </div>
     </div>
   </div>
 
@@ -127,6 +252,88 @@
         planes.push(new Plane(new THREE.Vector3(-norm, norm,0), norm)); // Left face  
         planes.push(new Plane(new THREE.Vector3(0, norm, norm), norm)); // Front face
         planes.push(new Plane(new THREE.Vector3(0, norm,-norm), norm)); // Back face
+      } else if (params.startingShape === 'diamond') {
+        // Diamond/Rhombus (octahedron)
+        const n = 1/Math.sqrt(3); // Normalize for equidistant faces
+        planes.push(new Plane(new THREE.Vector3( n, n, n), 1));
+        planes.push(new Plane(new THREE.Vector3( n, n,-n), 1));
+        planes.push(new Plane(new THREE.Vector3( n,-n, n), 1));
+        planes.push(new Plane(new THREE.Vector3( n,-n,-n), 1));
+        planes.push(new Plane(new THREE.Vector3(-n, n, n), 1));
+        planes.push(new Plane(new THREE.Vector3(-n, n,-n), 1));
+        planes.push(new Plane(new THREE.Vector3(-n,-n, n), 1));
+        planes.push(new Plane(new THREE.Vector3(-n,-n,-n), 1));
+      } else if (params.startingShape === 'rectangle') {
+        // Rectangle (elongated box): wider in x, normal in y, shorter in z
+        planes.push(new Plane(new THREE.Vector3( 1,0,0), 1.5)); // Wider in x
+        planes.push(new Plane(new THREE.Vector3(-1,0,0), 1.5));
+        planes.push(new Plane(new THREE.Vector3(0, 1,0), 1));   // Normal in y
+        planes.push(new Plane(new THREE.Vector3(0,-1,0), 1));
+        planes.push(new Plane(new THREE.Vector3(0,0, 1), 0.6)); // Shorter in z
+        planes.push(new Plane(new THREE.Vector3(0,0,-1), 0.6));
+      } else if (params.startingShape === 'parallelogram') {
+        // Parallelogram (skewed box)
+        const skew = 0.5; // Skew factor
+        planes.push(new Plane(new THREE.Vector3( 1, 0, skew).normalize(), 1.2));
+        planes.push(new Plane(new THREE.Vector3(-1, 0,-skew).normalize(), 1.2));
+        planes.push(new Plane(new THREE.Vector3( skew, 1, 0).normalize(), 1));
+        planes.push(new Plane(new THREE.Vector3(-skew,-1, 0).normalize(), 1));
+        planes.push(new Plane(new THREE.Vector3(0, 0, 1), 0.8));
+        planes.push(new Plane(new THREE.Vector3(0, 0,-1), 0.8));
+      } else if (params.startingShape === 'cylinder') {
+        // Cylinder (approximated with 12 faces)
+        // Top and bottom faces
+        planes.push(new Plane(new THREE.Vector3(0, 1, 0), 1));
+        planes.push(new Plane(new THREE.Vector3(0, -1, 0), 1));
+        
+        // 12 side faces to approximate a cylinder
+        const numSides = 12;
+        for (let i = 0; i < numSides; i++) {
+          const angle = (i * Math.PI * 2) / numSides;
+          const nx = Math.cos(angle);
+          const nz = Math.sin(angle);
+          planes.push(new Plane(new THREE.Vector3(nx, 0, nz), 1));
+        }
+      } else if (params.startingShape === 'star') {
+        // Proper 5-pointed star shape
+        // Top and bottom faces
+        planes.push(new Plane(new THREE.Vector3(0, 1, 0), 1));
+        planes.push(new Plane(new THREE.Vector3(0, -1, 0), 1));
+        
+        // Create a 5-pointed star with 10 vertical faces
+        const numPoints = 5;
+        
+        // Generate the 10 vertices of the star (alternating outer and inner)
+        for (let i = 0; i < numPoints * 2; i++) {
+          const angle = (i * Math.PI * 2) / (numPoints * 2) - Math.PI / 2; // Start from top
+          const nextAngle = ((i + 1) * Math.PI * 2) / (numPoints * 2) - Math.PI / 2;
+          
+          // Calculate the midpoint angle between current and next vertex
+          const midAngle = (angle + nextAngle) / 2;
+          
+          // Create a face perpendicular to the midpoint direction
+          const nx = Math.cos(midAngle);
+          const nz = Math.sin(midAngle);
+          
+          // Alternate between two distances to create star shape
+          const isOuter = i % 2 === 0;
+          const distance = isOuter ? 0.6 : 1.3;
+          
+          planes.push(new Plane(new THREE.Vector3(nx, 0, nz), distance));
+        }
+      } else if (params.startingShape === 'hexagon') {
+        // Hexagonal prism
+        // Top and bottom faces
+        planes.push(new Plane(new THREE.Vector3(0, 1, 0), 1));
+        planes.push(new Plane(new THREE.Vector3(0, -1, 0), 1));
+        
+        // Six side faces of the hexagon
+        for (let i = 0; i < 6; i++) {
+          const angle = (i * Math.PI * 2) / 6;
+          const nx = Math.cos(angle);
+          const nz = Math.sin(angle);
+          planes.push(new Plane(new THREE.Vector3(nx, 0, nz), 1));
+        }
       }
 
       for (let k=0; k<iterations; k++) {
@@ -137,7 +344,7 @@
         if (vertices.length === 0) break; // fully clipped (depth too high)
         
         // Limit planes to prevent exponential growth
-        if (planes.length > 100) {
+        if (planes.length > 200) {
           console.warn(`Stopping at iteration ${k+1}: too many planes (${planes.length})`);
           break;
         }
@@ -292,7 +499,7 @@
       transmission: 0.0,
       color: 0x6ba6ff,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.7, // This will be overridden by params.fillOpacity
       polygonOffset: true,
       polygonOffsetFactor: 1,
       polygonOffsetUnits: 1
@@ -361,18 +568,38 @@
     }
 
     function toggleAutoTransition() {
-      params.autoTransitionEnabled = !params.autoTransitionEnabled;
-      updateAutoTransitionButton();
-      
-      if (params.autoTransitionEnabled) {
-        startAutoTransition();
+      if (!params.autoTransitionEnabled) {
+        // Show popup to configure and start
+        showConfigPopup();
       } else {
+        // Pause the animation
+        params.autoTransitionEnabled = false;
+        updateAutoTransitionButton();
+        
         // Stop auto transition and any current animation
         animationState.isAutoTransitioning = false;
         animationState.isAnimating = false;
         animationState.isGlowing = false;
         animationState.onAnimationComplete = null;
       }
+    }
+    
+    function showConfigPopup() {
+      const popup = document.getElementById('configPopup');
+      popup.classList.remove('hidden');
+      
+      // Set current values
+      document.getElementById('popupShape').value = params.startingShape;
+      document.getElementById('popupDepth').value = params.depthPct;
+      document.getElementById('depthValue').textContent = params.depthPct + '%';
+      document.getElementById('popupOpacity').value = params.fillOpacity;
+      document.getElementById('opacityValue').textContent = params.fillOpacity + '%';
+      document.getElementById('popupColor').value = params.shapeColor;
+    }
+    
+    function hideConfigPopup() {
+      const popup = document.getElementById('configPopup');
+      popup.classList.add('hidden');
     }
     
     function startAutoTransition() {
@@ -385,9 +612,9 @@
       
       // Set initial cut speeds for each iteration
       animationState.cutSpeeds = {
-        1: 5000,
+        1: params.cutSpeed || 250,  // Use current cutSpeed for iteration 1
         2: 100,
-        3: 50,
+        3: 25,
         4: 10
       };
       
@@ -395,12 +622,12 @@
       params.iterations = 1;
       rebuild();
       
-      // Wait a moment then start transitioning
+      // Wait a shorter moment then start transitioning
       setTimeout(() => {
         if (params.autoTransitionEnabled) {
           transitionToNextIteration();
         }
-      }, 10000);
+      }, 2000); // Reduced from 10 seconds to 2 seconds
     }
     
     function transitionToNextIteration() {
@@ -445,7 +672,7 @@
         if (animationState.currentTransitionIndex < animationState.transitionIterations.length) {
           setTimeout(() => {
             transitionToNextIteration();
-          }, 500); // Brief pause between iterations
+          }, 200); // Reduced pause between iterations
         } else {
           animationState.isAutoTransitioning = false;
         }
@@ -496,8 +723,8 @@
       
       if (!animationState.isGlowing) {
         // Make the cut and start glowing
-        // For iteration 4, cut 2 vertices at a time
-        const cutsPerStep = (animationState.currentIteration === 4) ? 2 : 1;
+        // For iterations 4 and 5, cut more vertices at a time for better performance
+        const cutsPerStep = (animationState.currentIteration >= 4) ? 10 : 1;
         animationState.currentCut += cutsPerStep;
         
         // Get planes for current state with new plane tracking  
@@ -509,18 +736,29 @@
           const geom = buildGeometryFromPlanes(planes, newPlaneIndices);
           updateMeshWithNewSurfaces(geom);
           
-          // Start glow phase
-          animationState.isGlowing = true;
-          startGlowEffect();
-          
-          // After glow duration, fade out orange and continue
-          setTimeout(() => {
-            animationState.isGlowing = false;
-            // Remove orange surfaces and show normal geometry
-            const geom = buildGeometryFromPlanes(planes, []);
-            updateMesh(geom);
-            scheduleNextCut();
-          }, params.cutSpeed); // Wait for full glow cycle
+          // For iterations 4 and 5, skip glow effect for performance
+          if (animationState.currentIteration >= 4) {
+            // Skip glow for iterations 4 and 5, just update directly
+            const normalGeom = buildGeometryFromPlanes(planes, []);
+            updateMesh(normalGeom);
+            // Use requestAnimationFrame for smoother performance
+            requestAnimationFrame(() => {
+              scheduleNextCut();
+            });
+          } else {
+            // Start glow phase for other iterations
+            animationState.isGlowing = true;
+            startGlowEffect();
+            
+            // After glow duration, fade out orange and continue
+            setTimeout(() => {
+              animationState.isGlowing = false;
+              // Remove orange surfaces and show normal geometry
+              const geom = buildGeometryFromPlanes(planes, []);
+              updateMesh(geom);
+              scheduleNextCut();
+            }, params.cutSpeed); // Wait for full glow cycle
+          }
           
         } catch (e) {
           showError(e.message || String(e));
@@ -738,10 +976,12 @@
       iterations: 1,
       autoRotate: true,
       animateCuts: true,
-      cutSpeed: 500,         // milliseconds between cuts
+      cutSpeed: 250,         // milliseconds between cuts
       startingShape: 'cube', // 'cube' or 'pyramid'
+      fillOpacity: 70,       // opacity percentage for the shape fill
+      shapeColor: '#6ba6ff', // Default blue color
       resetView: () => { camera.position.set(4.2,3.2,4.6); controls.target.set(0,0,0); controls.update(); },
-      autoTransitionEnabled: true,
+      autoTransitionEnabled: false,  // Start with animation disabled
       toggleAutoTransition: () => { toggleAutoTransition(); }
     };
     
@@ -763,36 +1003,77 @@
     };
 
     const gui = new lil.GUI({ title: 'Controls' });
-    gui.add(params, 'startingShape', ['cube', 'pyramid']).name('Starting shape').onChange(rebuild);
+    gui.add(params, 'startingShape', ['cube', 'pyramid', 'diamond', 'rectangle', 'parallelogram', 'cylinder', 'star', 'hexagon']).name('Starting shape').onChange(rebuild);
     gui.add(params, 'depthPct', 0.1, 45, 0.1).name('Cut depth %').onChange(rebuild);
     window.iterController = gui.add(params, 'iterations', 0, 4, 1).name('Iterations').onChange(() => {
       if (!animationState.isAutoTransitioning) rebuild();
     });
     gui.add(params, 'animateCuts').name('Animate cuts');
     window.speedController = gui.add(params, 'cutSpeed', 50, 2000, 50).name('Cut speed (ms)');
+    gui.add(params, 'fillOpacity', 0, 100, 1).name('Fill opacity %').onChange(() => {
+      // Update material opacity
+      mat.opacity = params.fillOpacity / 100;
+    });
+    gui.addColor(params, 'shapeColor').name('Shape color').onChange(() => {
+      // Update material color
+      mat.color.set(params.shapeColor);
+    });
     gui.add(params, 'autoRotate').name('Auto-rotate');
     gui.add(params, 'resetView').name('Reset View');
     window.autoTransitionButton = gui.add(params, 'toggleAutoTransition').name('View Animation');
     
-    // Update button color based on state
+    // Update button color and text based on state
     function updateAutoTransitionButton() {
       const button = window.autoTransitionButton?.domElement?.querySelector('.name');
       if (button) {
         button.style.color = params.autoTransitionEnabled ? '#7dd3fc' : '#e6e9ef';
         button.style.fontWeight = params.autoTransitionEnabled ? '600' : '400';
+        button.textContent = params.autoTransitionEnabled ? 'Pause Animation' : 'View Animation';
       }
     }
 
+    // Setup popup event handlers
+    document.getElementById('popupDepth').addEventListener('input', (e) => {
+      document.getElementById('depthValue').textContent = e.target.value + '%';
+    });
+    
+    document.getElementById('popupOpacity').addEventListener('input', (e) => {
+      document.getElementById('opacityValue').textContent = e.target.value + '%';
+    });
+    
+    document.getElementById('startAnimation').addEventListener('click', () => {
+      // Get values from popup
+      params.startingShape = document.getElementById('popupShape').value;
+      params.depthPct = parseInt(document.getElementById('popupDepth').value);
+      params.fillOpacity = parseInt(document.getElementById('popupOpacity').value);
+      params.shapeColor = document.getElementById('popupColor').value;
+      
+      // Update material opacity and color
+      mat.opacity = params.fillOpacity / 100;
+      mat.color.set(params.shapeColor);
+      
+      // Hide popup and start animation
+      hideConfigPopup();
+      params.autoTransitionEnabled = true;
+      updateAutoTransitionButton();
+      
+      // Rebuild with new settings and start
+      rebuild();
+      startAutoTransition();
+    });
+    
+    document.getElementById('cancelPopup').addEventListener('click', () => {
+      hideConfigPopup();
+    });
+    
     // Build initial
     rebuild();
     
-    // Update button color initially and start auto-transition
+    // Update button initially
     setTimeout(() => {
       updateAutoTransitionButton();
-      // Start auto-transition on page load if enabled
-      if (params.autoTransitionEnabled) {
-        startAutoTransition();
-      }
+      // Show popup on page load
+      showConfigPopup();
     }, 500);
 
     // Animate
