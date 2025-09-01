@@ -1,6 +1,6 @@
 ### The Compounding Effect of Incremental Improvements
 
-One way to think of an incremental improvement is cutting a sharp edge of a process, solution or problem.  A single improvement may not make a noticable difference but in aggregate the changes can compound to tranform a nascent idea to a viable solution.
+One way to think of an incremental improvement is cutting a sharp edge of a process, solution or problem.  A single improvement may not make a noticeable difference but in aggregate the changes can compound to transform a nascent idea to a viable solution.
 
 We created this little visualization to help demonstrate it.  We hope you enjoy!
 
